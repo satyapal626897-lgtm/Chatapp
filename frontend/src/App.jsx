@@ -1,98 +1,134 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from 'react'
+import { useEffect } from 'react';
+import { useState } from 'react'
 import { io } from "socket.io-client";
-import PinLogin from "./PinLogin";
-import "./Ho.css";
-
-const socket = io("http://localhost:8000");
-
-const getTime = () =>
-  new Date().toLocaleTimeString("en-IN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const socket = io('http://localhost:8000');
+const socket = io(import.meta.env.VITE_API_URL);
+import "./Ho.css"
 
 const App = () => {
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [message, setMessage] = useState("");
+   const [message, setMessage] = useState("");
   const [chat, setChat] = useState([]);
-
-  const chatRef = useRef(null);
-
-  // 🔥 Single user fixed
-  const user = "satya";
+  const [dark, setDark] = useState(true);
 
   const sendMessage = () => {
-    if (message.trim() === "") return;
 
-    const msgData = {
-      message,
-      userId: user,
-      time: getTime(),
-    };
+    socket.emit("send_message", { message });
 
-    socket.emit("send_message", msgData);
+    // ❌ OLD
+    // setChat((prev) => [...prev, {message}])
+
+    // ✅ NEW (self add kiya)
+    setChat((prev) => [...prev, { message, self: true }])
+
     setMessage("");
-  };
+  }
 
   useEffect(() => {
-    socket.on("receive_message", (data) => {
-      setChat((prev) => [...prev, data]);
+    const handleMessage = (data) => {
 
-      setTimeout(() => {
-        chatRef.current?.scrollTo({
-          top: chatRef.current.scrollHeight,
-          behavior: "smooth",
-        });
-      }, 50);
-    });
+      // ❌ OLD
+      // setChat((prev) => [...prev, data])
+
+      // ✅ NEW (self false for other user)
+      setChat((prev) => [...prev, { ...data, self: false }])
+    };
+
+    socket.on('receive_message', handleMessage);
 
     return () => {
-      socket.off("receive_message");
+      socket.off('receive_message', handleMessage);
     };
   }, []);
 
-  if (!loggedIn) return <PinLogin onSuccess={() => setLoggedIn(true)} />;
-
-  return (
-    <div className="main-container">
-      <h1>Chat App</h1>
-
-      <div className="chat-card">
-        <div className="chat-header">
-          <div className="avatar">S</div>
-          <span className="header-name">Satya</span>
-          <div className="online-dot"></div>
-        </div>
-
-        <div className="chat-box" ref={chatRef}>
-          {chat.map((msg, i) => (
-            <div key={i} className="msg-group mine">
-              <div className="message my-msg">
-                {msg.message}
-              </div>
-              <span className="msg-time">{msg.time}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="input-area">
-          <input
-            type="text"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") sendMessage();
-            }}
-            placeholder="Type message..."
-          />
-
-          <button onClick={sendMessage}>
-            <i className="fa-regular fa-paper-plane"></i>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  const toggleTheme = () => {
+  setDark(!dark);
 };
+
+  // const [message, setMessage] = useState("");
+  // const [chat, setChat] = useState([]);
+
+  // const sendMessage = () => {
+
+  //   socket.emit("send_message", { message });
+  //   setChat((prev) => [...prev, {message}])
+  //   setMessage("");
+
+  // }
+  
+  // useEffect(() => {
+  //   const handleMessage = (data) => {
+  //     setChat((prev) => [...prev, data])
+  //   };
+    
+  //   socket.on('receive_message', handleMessage);
+    
+  //   return () => {
+  //     socket.off('receive_message', handleMessage);
+  //   };
+  // }, []);
+  
+  // useEffect(() => {
+  //   socket.on('receive_message', (data) => {
+  //     setChat((prev) => [...prev, data])
+  //   })
+  // }, [])
+  return (
+    <>
+
+  <div className={`app ${dark ? "dark" : "light"}`}>
+
+      <h1 className="title">wellcome my chat app</h1>
+
+      <button className="theme-btn" onClick={toggleTheme}>
+        {dark ? "☀️" : "🌙"}
+      </button>
+
+      <div className="chat-container">
+
+    <div className="chat-box">
+      {chat.map((msg) => (
+        <div className={`chat-message ${msg.self ? "right" : "left"}`}>
+          <p>{msg.message}</p>
+        </div>
+      ))}
+    </div>
+
+    <div className="chat-input">
+      <input
+        type='text'
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder="Type a message..."
+      />
+      <button onClick={sendMessage}>Send</button>
+    </div>
+
+  </div>
+
+</div>
+
+      {/* <h1>wellcome my chat app</h1>
+
+
+      <input type='text' value={message} onChange={(e) => { setMessage(e.target.value) }} />
+      <button onClick={sendMessage}>send</button>
+
+      <div>
+
+
+
+        {chat.map((msg)=>(
+
+        <tr>
+          <p>{msg.message}</p>
+        </tr>
+  ))}
+      </div> */}
+
+
+    </>
+  )
+}
 
 export default App;
