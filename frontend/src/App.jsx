@@ -1,136 +1,124 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
+import PinLogin from "./PinLogin";
 import "./Ho.css";
 
 const socket = io("http://localhost:8000");
 
+const getTime = () =>
+  new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+
 const App = () => {
+  const [loggedIn, setLoggedIn] = useState(false);
   const [message1, setMessage1] = useState("");
   const [message2, setMessage2] = useState("");
   const [chat, setChat] = useState([]);
-  const [typingUser, setTypingUser] = useState(""); // ✅ NEW
+  const [typingUser, setTypingUser] = useState("");
+  const typingTimer = useRef(null);
+  const box1Ref = useRef(null);
+  const box2Ref = useRef(null);
 
-  // send message
   const sendMessage = (user, msg) => {
     if (msg.trim() === "") return;
-
-    socket.emit("send_message", { message: msg, userId: user });
+    socket.emit("send_message", { message: msg, userId: user, time: getTime() });
   };
 
   useEffect(() => {
-    const receiveHandler = (data) => {
+    socket.on("receive_message", (data) => {
       setChat((prev) => [...prev, data]);
-    };
-
-    // ✅ typing receive
-    const typingHandler = (user) => {
-      setTypingUser(user);
-
       setTimeout(() => {
-        setTypingUser("");
-      }, 1500);
-    };
+        box1Ref.current?.scrollTo({ top: 9999, behavior: "smooth" });
+        box2Ref.current?.scrollTo({ top: 9999, behavior: "smooth" });
+      }, 50);
+    });
 
-    socket.on("receive_message", receiveHandler);
-    socket.on("typing", typingHandler); // ✅ NEW
+    socket.on("typing", (user) => {
+      setTypingUser(user);
+      clearTimeout(typingTimer.current);
+      typingTimer.current = setTimeout(() => setTypingUser(""), 1500);
+    });
 
     return () => {
-      socket.off("receive_message", receiveHandler);
-      socket.off("typing", typingHandler); // ✅ NEW
+      socket.off("receive_message");
+      socket.off("typing");
     };
   }, []);
 
+  const handleTyping = (user, setter, value) => {
+    setter(value);
+    socket.emit("typing", user);
+  };
+
+  if (!loggedIn) return <PinLogin onSuccess={() => setLoggedIn(true)} />;
+
   return (
     <div className="main-container">
-      <h1>💬 Chat App</h1>
-
+      <h1>Chat App</h1>
       <div className="chat-wrapper">
-        
-        {/* USER 1 */}
-        <div className="chat-card">
-          <div className="header">User 1</div>
 
-          <div className="chat-box">
+        <div className="chat-card">
+          <div className="chat-header">
+            <div className="avatar avatar-1">S</div>
+            <span className="header-name">Satya</span>
+            <div className="online-dot"></div>
+          </div>
+          <div className="chat-box" ref={box1Ref}>
             {chat.map((msg, i) => (
-              <div
-                key={i}
-                className={
-                  msg.userId === "user1"
-                    ? "message my-msg"
-                    : "message other-msg"
-                }
-              >
-                {msg.message}
+              <div key={i} className={`msg-group ${msg.userId === "satya" ? "mine" : "theirs"}`}>
+                <div className={`message ${msg.userId === "satya" ? "my-msg" : "other-msg"}`}>
+                  {msg.message}
+                </div>
+                <span className="msg-time">{msg.time}</span>
               </div>
             ))}
-
-            {/* ✅ typing show */}
-            {typingUser === "user2" && (
-              <p className="typing">User2 typing...</p>
-            )}
+            <div className="typing-indicator" style={{ visibility: typingUser === "vikash" ? "visible" : "hidden" }}>
+              <div className="typing-dots"><span/><span/><span/></div>
+              <span className="typing-text">Vikash typing...</span>
+            </div>
           </div>
-
           <div className="input-area">
             <input
               type="text"
               value={message1}
-              onChange={(e) => {
-                setMessage1(e.target.value);
-                socket.emit("typing", "user1"); // ✅ NEW
-              }}
-              placeholder="User1 message..."
+              onChange={(e) => handleTyping("satya", setMessage1, e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { sendMessage("satya", message1); setMessage1(""); }}}
+              placeholder="Satya ka message..."
             />
-            <button
-              onClick={() => {
-                sendMessage("user1", message1);
-                setMessage1("");
-              }}
-            >
+            <button onClick={() => { sendMessage("satya", message1); setMessage1(""); }}>
               <i className="fa-regular fa-paper-plane"></i>
             </button>
           </div>
         </div>
 
-        {/* USER 2 */}
         <div className="chat-card">
-          <div className="header">User 2</div>
-
-          <div className="chat-box">
+          <div className="chat-header">
+            <div className="avatar avatar-2">V</div>
+            <span className="header-name">Vikash</span>
+            <div className="online-dot"></div>
+          </div>
+          <div className="chat-box" ref={box2Ref}>
             {chat.map((msg, i) => (
-              <div
-                key={i}
-                className={
-                  msg.userId === "user2"
-                    ? "message my-msg"
-                    : "message other-msg"
-                }
-              >
-                {msg.message}
+              <div key={i} className={`msg-group ${msg.userId === "vikash" ? "mine" : "theirs"}`}>
+                <div className={`message ${msg.userId === "vikash" ? "my-msg" : "other-msg"}`}>
+                  {msg.message}
+                </div>
+                <span className="msg-time">{msg.time}</span>
               </div>
             ))}
-
-            {/* ✅ typing show */}
-            {typingUser === "user1" && (
-              <p className="typing">User1 typing...</p>
-            )}
+            <div className="typing-indicator" style={{ visibility: typingUser === "satya" ? "visible" : "hidden" }}>
+              <div className="typing-dots"><span/><span/><span/></div>
+              <span className="typing-text">Satya typing...</span>
+            </div>
           </div>
-
           <div className="input-area">
             <input
               type="text"
               value={message2}
-              onChange={(e) => {
-                setMessage2(e.target.value);
-                socket.emit("typing", "user2"); // ✅ NEW
-              }}
-              placeholder="User2 message..."
+              onChange={(e) => handleTyping("vikash", setMessage2, e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { sendMessage("vikash", message2); setMessage2(""); }}}
+              placeholder="Vikash ka message..."
             />
-            <button
-              onClick={() => {
-                sendMessage("user2", message2);
-                setMessage2("");
-              }}
-            >
+            <button onClick={() => { sendMessage("vikash", message2); setMessage2(""); }}>
               <i className="fa-regular fa-paper-plane"></i>
             </button>
           </div>
